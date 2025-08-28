@@ -4,29 +4,34 @@ import Image from "next/image";
 
 export const revalidate = 0;
 
-type PageProps = {
-  params: { editor: string };
-  searchParams?: Record<string, string | string[] | undefined>;
-};
-
 const PAGE_SIZE = 12;
 
-function getString(sp: Record<string, string | string[] | undefined> | undefined, key: string): string {
-  const v = sp?.[key];
+function getString(sp: Record<string, string | string[] | undefined>, key: string): string {
+  const v = sp[key];
   return typeof v === "string" ? v : "";
 }
 
 function parseDurationRange(s: string) {
   const m = s.match(/^(\d+)-(\d+)$/);
   if (!m) return null;
-  const min = Number(m[1]);
-  const max = Number(m[2]);
+  const min = Number(m[17]);
+  const max = Number(m[18]);
   if (Number.isNaN(min) || Number.isNaN(max)) return null;
   return { min, max };
 }
 
-export default async function EditorPage({ params, searchParams }: PageProps) {
-  const slug = params.editor;
+export default async function EditorPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ editor: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Await the promises in Next.js 15
+  const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
+
+  const slug = resolvedParams.editor;
 
   const { data: editorRow, error: editorErr } = await supabase
     .from("editors")
@@ -36,13 +41,13 @@ export default async function EditorPage({ params, searchParams }: PageProps) {
 
   if (editorErr || !editorRow) return notFound();
 
-  const q = getString(searchParams, "q");
-  const orientation = getString(searchParams, "orientation");
-  const is_free = getString(searchParams, "is_free");
-  const difficulty = getString(searchParams, "difficulty");
-  const duration = getString(searchParams, "duration");
-  const sort = getString(searchParams, "sort");
-  const pageNum = Number(getString(searchParams, "page") || "1");
+  const q = getString(resolvedSearchParams, "q");
+  const orientation = getString(resolvedSearchParams, "orientation");
+  const is_free = getString(resolvedSearchParams, "is_free");
+  const difficulty = getString(resolvedSearchParams, "difficulty");
+  const duration = getString(resolvedSearchParams, "duration");
+  const sort = getString(resolvedSearchParams, "sort");
+  const pageNum = Number(getString(resolvedSearchParams, "page") || "1");
   const page = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1;
 
   let query = supabase
@@ -83,7 +88,7 @@ export default async function EditorPage({ params, searchParams }: PageProps) {
   const totalPages = count ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : 1;
 
   const sp = new URLSearchParams(
-    Object.entries((searchParams ?? {}) as Record<string, string>)
+    Object.entries(resolvedSearchParams)
       .filter(([, v]) => typeof v === "string" && v.length > 0)
       .map(([k, v]) => [k, String(v)])
   );
